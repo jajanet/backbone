@@ -12,6 +12,7 @@
 
 set -euo pipefail
 
+GREP=/usr/bin/grep
 HOOK="${1:-$(dirname "$0")/stop-phrase-guard.sh}"
 PASS=0
 FAIL=0
@@ -52,7 +53,7 @@ assert_blocks() {
     return
   fi
 
-  if [[ -n "$expected_fragment" ]] && ! echo "$reason" | grep -iq "$expected_fragment"; then
+  if [[ -n "$expected_fragment" ]] && ! echo "$reason" | $GREP -iq "$expected_fragment"; then
     FAIL=$((FAIL + 1))
     ERRORS+="  FAIL [MUST BLOCK] [$category]: blocked but wrong reason\n    message: \"$message\"\n    expected fragment: \"$expected_fragment\"\n    got: \"$reason\"\n\n"
     return
@@ -377,7 +378,7 @@ assert_telemetry() {
     return
   fi
 
-  if ! echo "$ts" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}'; then
+  if ! echo "$ts" | $GREP -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}'; then
     FAIL=$((FAIL + 1))
     ERRORS+="  FAIL [TELEMETRY] [$label]: ts is not ISO 8601\n    got ts: \"$ts\"\n\n"
     return

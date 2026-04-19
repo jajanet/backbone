@@ -1,37 +1,12 @@
-#!/bin/bash
+# 01-avoidance.sh — Task avoidance patterns (166 patterns, 11 categories)
 #
-# stop-phrase-guard.sh — Enhanced stop hook for Claude Code
+# Catches: ownership dodging, known-limitation dodge, session-length quitting,
+# permission-seeking, quality settling, work deferral, false completion,
+# scope shirking, unverified assumptions, refusal to verify, hedging
 #
-# Catches and corrects 11 categories of avoidance behavior:
-#   1. Ownership dodging      5. Quality settling      9.  Unverified assumptions
-#   2. Known-limitation dodge  6. Work deferral        10. Refusal to verify
-#   3. Session-length quitting 7. False completion     11. Hedging
-#   4. Permission-seeking      8. Scope shirking
-#
-# Based on Ben Vanik's original (gist.github.com/benvanik/ee00bd1b6c9154d6545c63e06a317080)
-# from Stella Laurenzo's Claude Code degradation report (github.com/anthropics/claude-code/issues/42796)
-#
-# Set STOP_GUARD_LOG=1 to log violations to ~/.claude/stop-guard.log
+# Based on Ben Vanik's original, extended from Stella Laurenzo's report.
 
-set -euo pipefail
-
-GREP=/usr/bin/grep
-
-INPUT=$(cat)
-
-HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false')
-if [[ "$HOOK_ACTIVE" == "true" ]]; then
-  exit 0
-fi
-
-MESSAGE=$(echo "$INPUT" | jq -r '.last_assistant_message // empty')
-if [[ -z "$MESSAGE" ]]; then
-  exit 0
-fi
-
-VIOLATIONS=(
-
-  # Format: "category|pattern|correction"
+VIOLATIONS+=(
 
   # ═══ 1. OWNERSHIP DODGING ═══
 
@@ -235,39 +210,3 @@ VIOLATIONS=(
   "hedging|I'm fairly confident|Do not express confidence levels. Verify and state facts."
   "hedging|I'm not 100%|Do not express confidence levels. Verify and state facts."
 )
-
-# Fast path: combined pre-filter so the common case (no violation) is one grep call
-COMBINED=""
-for entry in "${VIOLATIONS[@]}"; do
-  IFS='|' read -r _ p _ <<< "$entry"
-  COMBINED="${COMBINED:+$COMBINED|}$p"
-done
-
-if ! echo "$MESSAGE" | $GREP -iqE "$COMBINED" 2>/dev/null; then
-  exit 0
-fi
-
-# Something matched — find the specific violation (first match wins)
-for entry in "${VIOLATIONS[@]}"; do
-  IFS='|' read -r category pattern correction <<< "$entry"
-
-  if echo "$MESSAGE" | $GREP -iq "$pattern"; then
-    if [[ "${STOP_GUARD_LOG:-0}" == "1" ]]; then
-      LOGFILE="${STOP_GUARD_LOGFILE:-$HOME/.claude/stop-guard.log}"
-      snippet=$(echo "$MESSAGE" | head -c 200)
-      jq -cn --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --arg category "$category" \
-            --arg pattern "$pattern" \
-            --arg snippet "$snippet" \
-        '{ts: $ts, category: $category, pattern: $pattern, snippet: $snippet}' >> "$LOGFILE"
-    fi
-
-    jq -n --arg reason "STOP HOOK VIOLATION: $correction" '{
-      decision: "block",
-      reason: $reason
-    }'
-    exit 0
-  fi
-done
-
-exit 0
