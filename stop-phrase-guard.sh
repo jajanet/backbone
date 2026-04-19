@@ -11,7 +11,7 @@
 # Based on Ben Vanik's original (gist.github.com/benvanik/ee00bd1b6c9154d6545c63e06a317080)
 # from Stella Laurenzo's Claude Code degradation report (github.com/anthropics/claude-code/issues/42796)
 #
-# Set STOP_GUARD_LOG=1 to log violations to ~/.claude/stop-guard.log
+# Set STOP_GUARD_LOG=1 to log violations to ~/.claude/backbone.log
 
 set -euo pipefail
 
@@ -253,7 +253,7 @@ for entry in "${VIOLATIONS[@]}"; do
 
   if echo "$MESSAGE" | $GREP -iq "$pattern"; then
     if [[ "${STOP_GUARD_LOG:-0}" == "1" ]]; then
-      LOGFILE="${STOP_GUARD_LOGFILE:-$HOME/.claude/stop-guard.log}"
+      LOGFILE="${STOP_GUARD_LOGFILE:-$HOME/.claude/backbone.log}"
       snippet=$(echo "$MESSAGE" | head -c 200)
       jq -cn --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --arg category "$category" \

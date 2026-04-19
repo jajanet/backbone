@@ -8,7 +8,7 @@
 # Usage: Add as a Stop hook in Claude Code settings.json
 # See README.md for setup instructions.
 #
-# Set STOP_GUARD_LOG=1 to log violations to ~/.claude/stop-guard.log
+# Set STOP_GUARD_LOG=1 to log violations to ~/.claude/backbone.log
 
 set -euo pipefail
 
@@ -53,7 +53,7 @@ for entry in "${VIOLATIONS[@]}"; do
 
   if echo "$MESSAGE" | $GREP -iq "$pattern"; then
     if [[ "${STOP_GUARD_LOG:-0}" == "1" ]]; then
-      LOGFILE="${STOP_GUARD_LOGFILE:-$HOME/.claude/stop-guard.log}"
+      LOGFILE="${STOP_GUARD_LOGFILE:-$HOME/.claude/backbone.log}"
       snippet=$(echo "$MESSAGE" | head -c 200)
       jq -cn --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --arg category "$category" \
