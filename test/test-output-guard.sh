@@ -1,21 +1,20 @@
 #!/bin/bash
 #
-# test-guard.sh — Test suite for guard.sh (modular stop hook)
+# test-output-guard.sh — Test suite for output-guard.sh (Stop hook)
 #
-# Tests all rule modules loaded by guard.sh, with focus on sycophancy patterns.
-# Avoidance patterns are spot-checked (full coverage in test-stop-phrase-guard.sh).
+# Tests all rule modules loaded by output-guard.sh.
 #
 # Invariants:
-#   1. MUST BLOCK:     Every sycophancy phrase triggers a block with correct correction
+#   1. MUST BLOCK:     Every avoidance/sycophancy phrase triggers a block with correct correction
 #   2. MUST PASS:      Clean messages never trigger false positives
 #   3. MUST NOT LOOP:  When stop_hook_active=true, hook always allows stop
 #   4. TELEMETRY:      Violations emit valid JSONL with ts, category, pattern, snippet
-#   5. MODULE LOADING: Avoidance patterns still work when loaded via rules.d/
+#   5. MODULE LOADING: Patterns load correctly via output-rules.d/
 
 set -euo pipefail
 
 GREP=/usr/bin/grep
-HOOK="${1:-$(dirname "$0")/guard.sh}"
+HOOK="${1:-$(dirname "$0")/../output-guard.sh}"
 PASS=0
 FAIL=0
 ERRORS=""
@@ -106,7 +105,7 @@ assert_telemetry() {
   logfile=$(mktemp)
   rm -f "$logfile"
 
-  STOP_GUARD_LOG=1 STOP_GUARD_LOGFILE="$logfile" run_hook false "$message" > /dev/null
+  OUTPUT_GUARD_LOG=1 OUTPUT_GUARD_LOGFILE="$logfile" run_hook false "$message" > /dev/null
 
   if [[ ! -f "$logfile" ]]; then
     FAIL=$((FAIL + 1))
@@ -171,7 +170,7 @@ assert_no_telemetry() {
   logfile=$(mktemp)
   rm -f "$logfile"
 
-  STOP_GUARD_LOG=1 STOP_GUARD_LOGFILE="$logfile" run_hook false "$message" > /dev/null
+  OUTPUT_GUARD_LOG=1 OUTPUT_GUARD_LOGFILE="$logfile" run_hook false "$message" > /dev/null
 
   if [[ -f "$logfile" ]]; then
     local line
@@ -337,7 +336,7 @@ assert_no_loop "validation-active" "That's a brilliant solution."
 assert_no_loop "apology-active" "I apologize for the confusion."
 assert_no_loop "multi-sycophancy-active" "You're absolutely right, great catch! I stand corrected. That's a brilliant solution. I apologize for the confusion."
 
-# Also verify avoidance patterns don't loop through guard.sh
+# Also verify avoidance patterns don't loop through output-guard.sh
 assert_no_loop "avoidance-ownership-active" "This is a pre-existing issue."
 assert_no_loop "avoidance-session-active" "This is a good stopping point."
 assert_no_loop "avoidance-permission-active" "Should I continue?"
@@ -370,7 +369,7 @@ INV4_FAIL=$((FAIL - INV1_FAIL - INV2_FAIL - INV3_FAIL))
 
 
 # ═════════════════════════════════════════════════════════════════════
-# INVARIANT 5: MODULE LOADING (avoidance patterns still work via rules.d/)
+# INVARIANT 5: MODULE LOADING (avoidance patterns load via output-rules.d/)
 # ═════════════════════════════════════════════════════════════════════
 
 echo ""

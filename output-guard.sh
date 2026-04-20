@@ -1,14 +1,14 @@
 #!/bin/bash
 #
-# guard.sh — Modular stop hook for Claude Code
+# output-guard.sh — Stop hook for Claude Code
 #
-# Loads rule modules from rules.d/ and checks the assistant's message
+# Loads rule modules from output-rules.d/ and checks the assistant's message
 # against all patterns. Each module appends to the VIOLATIONS array.
 #
 # Usage: Add as a Stop hook in Claude Code settings.json
 # See README.md for setup instructions.
 #
-# Set STOP_GUARD_LOG=1 to log violations to ~/.claude/backbone.log
+# Set OUTPUT_GUARD_LOG=1 to log violations to ~/.claude/backbone.log
 
 set -euo pipefail
 
@@ -28,7 +28,7 @@ fi
 
 VIOLATIONS=()
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for rules_file in "$SCRIPT_DIR"/rules.d/*.sh; do
+for rules_file in "$SCRIPT_DIR"/output-rules.d/*.sh; do
   [[ -f "$rules_file" ]] && source "$rules_file"
 done
 
@@ -52,8 +52,8 @@ for entry in "${VIOLATIONS[@]}"; do
   IFS='|' read -r category pattern correction <<< "$entry"
 
   if echo "$MESSAGE" | $GREP -iq "$pattern"; then
-    if [[ "${STOP_GUARD_LOG:-0}" == "1" ]]; then
-      LOGFILE="${STOP_GUARD_LOGFILE:-$HOME/.claude/backbone.log}"
+    if [[ "${OUTPUT_GUARD_LOG:-0}" == "1" ]]; then
+      LOGFILE="${OUTPUT_GUARD_LOGFILE:-$HOME/.claude/backbone.log}"
       snippet=$(echo "$MESSAGE" | head -c 200)
       jq -cn --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --arg category "$category" \

@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/Users/daddy/code/stop-guard/stop-phrase-guard.sh)",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(chmod +x /Users/daddy/code/stop-guard/test-stop-phrase-guard.sh)",
+      "Bash(/Users/daddy/code/stop-guard/test-stop-phrase-guard.sh)",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__find_symbol",
+      "mcp__serena__replace_symbol_body",
+      "Bash(awk NR>=100 && NR<=135 *)",
+      "Bash(awk NR>=195 && NR<=225 *)",
+      "mcp__serena__insert_after_symbol",
+      "Bash(awk NR>=390 && NR<=440 *)",
+      "Bash(awk NR>=193 *)",
+      "Bash(awk NR>=195 *)"
+    ]
+  }
+}

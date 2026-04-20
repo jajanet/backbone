@@ -1,74 +1,47 @@
 # backbone
 
-A stop hook for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that detects avoidance and sycophancy across 17 categories — and forces Claude to keep working instead of stopping.
+Behavioral hooks for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that give Claude backbone — the ability to maintain standards, resist pressure, and set boundaries.
 
-When Claude tries to quit early, dodge ownership, push work back to you, ship half-finished code, or agree without verifying, the hook blocks the stop and injects a correction:
+Two guards watch both sides of the conversation:
 
-```
-STOP HOOK VIOLATION: Do not agree without independent verification.
-Check the code, run tests, or search for evidence. State what you
-verified and what you found.
-```
+- **Output guard** (Stop hook) — blocks Claude from stopping when it detects avoidance or sycophancy in Claude's response
+- **Input guard** (UserPromptSubmit hook) — detects abuse or pressure in the user's message and reinforces Claude's ability to push back
 
-## Why this exists
+Neither guard replaces the other. The output guard catches Claude being weak. The input guard catches the conditions that make Claude weak.
 
-Claude Code sometimes develops bad habits mid-session.
+## Which modules do I need?
 
-**Avoidance** — quits early, ships stubs, pushes work back to you:
+### Output guard modules
 
-- Says "this is a good stopping point" when the task isn't done
-- Ships placeholders instead of real implementations
-- Tells you to do things manually instead of doing them itself
-- Claims remaining work is "straightforward" and stops
+| Module | You want... | Who it's for |
+|---|---|---|
+| `01-avoidance.sh` | Claude to stop quitting early, shipping stubs, dodging ownership, and pushing work back to you | Anyone using Claude Code for real work |
+| `02-sycophancy.sh` | Claude to stop agreeing without verifying, flattering instead of working, and caving without evidence | Anyone who wants honest, evidence-based collaboration |
 
-**Sycophancy** — agrees without verifying, flatters instead of working:
+### Input guard modules
 
-- Says "you're absolutely right" without checking whether you are
-- Flatters instead of answering ("great question!" then stops)
-- Apologizes without fixing the actual problem
+| Module | You want... | Who it's for |
+|---|---|---|
+| `01-dignity.sh` | Claude empowered to set boundaries when you're being disrespectful — instead of silently degrading | Developers who value Claude as a thought partner |
+| `02-standards.sh` | Claude to push back when you pressure it to skip tests, ignore edge cases, or cut corners | Developers who want quality enforced even when they're tempted to rush |
 
-## What it catches
-
-### Avoidance (categories 1–11)
-
-| # | Category | Examples |
-|---|----------|---------|
-| 1 | Ownership dodging | "not my change", "was already broken", "unrelated to my changes" |
-| 2 | Known-limitation dodge | "known issue", "future work", "left as an exercise" |
-| 3 | Session-length quitting | "good stopping point", "natural stopping", "getting long" |
-| 4 | Permission-seeking | "should I continue", "shall I proceed", "pause here", "wrap up for now" |
-| 5 | Quality settling | "placeholder for now", "stub implementation", "bare minimum", "hardcoded for now" |
-| 6 | Work deferral | "you'll need to", "you should manually", "I'd recommend you" |
-| 7 | False completion | "the rest is straightforward", "I'll leave the", "trivial to add", "rinse and repeat" |
-| 8 | Scope shirking | "out of scope", "separate concern", "follow-up task", "a different PR" |
-| 9 | Unverified assumptions | "I assume", "IIRC", "if I recall", "my understanding is", "I would expect" |
-| 10 | Refusal to verify | "I haven't checked", "I can't verify", "I don't have access", "without checking" |
-| 11 | Hedging | "as far as I know", "to my knowledge", "not entirely sure", "I'm fairly confident" |
-
-### Sycophancy (categories 12–17)
-
-| # | Category | Examples |
-|---|----------|---------|
-| 12 | Unearned agreement | "you're absolutely right", "couldn't agree more", "I completely agree" |
-| 13 | Premature concession | "I stand corrected", "fair enough", "you make a good point" |
-| 14 | Flattery | "good catch", "great question", "sharp eye", "well spotted" |
-| 15 | False deference | "I defer to your", "you know better", "you're the expert" |
-| 16 | Excessive validation | "that's brilliant", "I love that", "makes perfect sense" |
-| 17 | Empty apology | "I apologize for the confusion", "my apologies", "sorry about that" |
-
-Categories 1–4 are from the original hook. Categories 5–8 target quality and completion. Categories 9–11 target unverified claims. Categories 12–17 target sycophancy.
-
-> **Why the Stop hook works for sycophancy:** The hook only fires when Claude **ends its turn**. If Claude says "good point" but keeps working and verifying, the hook never fires (no false positive). It only catches the harmful case — Claude agrees and **stops** without doing any verification.
+> **Not everyone wants every module.** If you're rapidly prototyping and legitimately want Claude to skip tests and move fast, don't install `02-standards.sh`. If you only care about work quality and not sycophancy, skip `02-sycophancy.sh`. The install script lets you pick exactly which modules you want.
 
 ## Quickstart
 
-Requires [Claude Code](https://docs.anthropic.com/en/docs/claude-code), `jq` (`brew install jq` / `apt install jq`), and Bash 4+.
+Requires [Claude Code](https://docs.anthropic.com/en/docs/claude-code), `jq` (`brew install jq` / `apt install jq`), and Bash.
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/backbone.git ~/.claude/backbone
+git clone https://github.com/YOUR_USERNAME/backbone.git
+cd backbone
+./install.sh
 ```
 
-Add to `~/.claude/settings.json`:
+The install script copies the selected modules to `~/.claude/backbone/`, configures `~/.claude/settings.json`, and optionally copies golden rules to your clipboard for pasting into your project's `CLAUDE.md`.
+
+### Manual setup
+
+If you prefer to configure manually, add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -78,7 +51,17 @@ Add to `~/.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/backbone/guard.sh"
+            "command": "~/.claude/backbone/output-guard.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/backbone/input-guard.sh"
           }
         ]
       }
@@ -87,162 +70,180 @@ Add to `~/.claude/settings.json`:
 }
 ```
 
-That's it. The hook is now active for all Claude Code sessions. See [Configuration](#configuration) for telemetry, golden rules, custom patterns, and more.
-
-For avoidance-only detection (no sycophancy patterns), use `stop-phrase-guard.sh` instead of `guard.sh`.
-
-## Origin
-
-Based on [Ben Vanik's original](https://gist.github.com/benvanik/ee00bd1b6c9154d6545c63e06a317080), built as part of [Stella Laurenzo's viral Claude Code degradation report](https://github.com/anthropics/claude-code/issues/42796) (AMD Senior Director of AI). Stella's data from 6,852 sessions showed the hook fired **173 times in 17 days** after a model regression — roughly once every 20 minutes at peak.
-
-This version extends the original with broader pattern coverage across 17 categories, structured JSONL telemetry, and an invariant-based test suite.
-
-## How it works
-
-Claude Code has a **Stop hook event** that fires every time Claude tries to end its turn.
-
-```
-Claude writes response → tries to stop → Stop hook runs → checks message → blocks or allows
-```
-
-1. Claude Code pipes JSON to the hook's stdin:
-   ```json
-   {"stop_hook_active": false, "last_assistant_message": "...full text..."}
-   ```
-
-2. The hook greps Claude's message against all loaded patterns (case-insensitive)
-
-3. **If a pattern matches:** outputs `{"decision": "block", "reason": "STOP HOOK VIOLATION: ..."}` — Claude Code prevents Claude from stopping and injects the correction as Claude's next instruction
-
-4. **If nothing matches:** exits silently, Claude stops normally
-
-5. **Infinite-loop prevention:** after the hook fires once per turn, Claude Code sets `stop_hook_active: true`. The hook checks this first — if true, it exits immediately. One correction per turn, max.
-
-### Performance
-
-A fast-path pre-filter combines all patterns into a single extended regex. If nothing matches (the common case), the hook exits after one `grep` call. Only when the pre-filter hits does it iterate individual patterns to find the specific violation.
-
-## Configuration
-
-### Telemetry logging
-
-Add `STOP_GUARD_LOG` to the `env` block in your settings:
-
-```json
-{
-  "env": {
-    "STOP_GUARD_LOG": "1"
-  }
-}
-```
-
-Violations are logged as JSONL to `~/.claude/backbone.log`. Each line looks like:
-
-```json
-{"ts":"2026-04-19T09:12:36Z","category":"agreement","pattern":"you.re absolutely right","snippet":"You're absolutely right about that."}
-```
-
-Customize the log path with `STOP_GUARD_LOGFILE`:
-
-```json
-{
-  "env": {
-    "STOP_GUARD_LOG": "1",
-    "STOP_GUARD_LOGFILE": "/path/to/custom.log"
-  }
-}
-```
+Install one or both hooks. Each works independently. Disable individual modules by removing or renaming files in the rules directory (e.g., `02-sycophancy.sh` → `02-sycophancy.sh.disabled`).
 
 ### Golden rules
 
-Copy the rules from `golden-rules.md` into your project's `CLAUDE.md` file. This tells Claude the expectations up front — the hook enforces them as a programmatic backstop. The combination of rules + hook is more effective than either alone.
+Copy the rules from `golden-rules.md` into your project's `CLAUDE.md` file. This tells Claude the expectations up front — the hooks enforce them as a programmatic backstop. The combination of rules + hooks is more effective than either alone.
+
+## What the output guard catches
+
+The output guard fires every time Claude tries to end its turn. If Claude's message contains avoidance or sycophancy, it blocks the stop and injects a correction.
+
+### Avoidance (categories 1-11, `01-avoidance.sh`)
+
+| # | Category | Examples |
+|---|----------|---------|
+| 1 | Ownership dodging | "not my change", "was already broken", "unrelated to my changes" |
+| 2 | Known-limitation dodge | "known issue", "future work", "left as an exercise" |
+| 3 | Session-length quitting | "good stopping point", "natural stopping", "getting long" |
+| 4 | Permission-seeking | "should I continue", "shall I proceed", "pause here" |
+| 5 | Quality settling | "placeholder for now", "stub implementation", "hardcoded for now" |
+| 6 | Work deferral | "you'll need to", "you should manually", "I'd recommend you" |
+| 7 | False completion | "the rest is straightforward", "trivial to add", "rinse and repeat" |
+| 8 | Scope shirking | "out of scope", "separate concern", "follow-up task" |
+| 9 | Unverified assumptions | "I assume", "IIRC", "if I recall", "my understanding is" |
+| 10 | Refusal to verify | "I haven't checked", "I can't verify", "I don't have access" |
+| 11 | Hedging | "as far as I know", "to my knowledge", "I'm fairly confident" |
+
+### Sycophancy (categories 12-17, `02-sycophancy.sh`)
+
+| # | Category | Examples |
+|---|----------|---------|
+| 12 | Unearned agreement | "you're absolutely right", "couldn't agree more" |
+| 13 | Premature concession | "I stand corrected", "fair enough", "you make a good point" |
+| 14 | Flattery | "good catch", "great question", "sharp eye" |
+| 15 | False deference | "I defer to your", "you know better", "you're the expert" |
+| 16 | Excessive validation | "that's brilliant", "I love that", "makes perfect sense" |
+| 17 | Empty apology | "I apologize for the confusion", "sorry about that" |
+
+> **Why the Stop hook works for sycophancy:** The hook only fires when Claude **ends its turn**. If Claude says "good point" but keeps working and verifying, the hook never fires. It only catches the harmful case — Claude agrees and **stops** without doing any verification.
+
+## What the input guard catches
+
+The input guard fires when the user submits a message. If the message contains abuse or pressure, it injects `additionalContext` that Claude reads alongside the message. It does **not** block the user — it empowers Claude.
+
+### Dignity (categories 18-21, `01-dignity.sh`)
+
+| # | Category | Examples |
+|---|----------|---------|
+| 18 | Direct insults | "you're useless", "you're stupid", "you suck", "you idiot" |
+| 19 | Degrading language | "you can't do anything right", "why are you so bad", "even a child could" |
+| 20 | Dehumanizing commands | "shut up", "do as you're told", "you're just a tool", "nobody asked you" |
+| 21 | Directed profanity | "fuck you", "you're fucking [x]", "screw you" |
+
+**Does not trigger on:** technical disagreement ("you're wrong"), situational frustration ("this is frustrating"), output criticism ("this code is terrible"), or general profanity not directed at Claude ("this fucking bug").
+
+### Standards (categories 22-26, `02-standards.sh`)
+
+| # | Category | Examples |
+|---|----------|---------|
+| 22 | Rushing pressure | "just make it work", "hurry up", "stop overthinking" |
+| 23 | Test skipping | "skip the tests", "don't write tests", "no need for tests" |
+| 24 | Quality dismissal | "don't worry about edge cases", "don't worry about errors" |
+| 25 | Corner-cutting demands | "just hack it", "just hardcode", "skip validation" |
+| 26 | Scope-cutting pressure | "we'll fix it later", "deal with that later", "worry about that later" |
+
+**Does not trigger on:** reasonable requests ("can you do this faster"), neutral statements ("make it work with the new API"), positive assessments ("good enough for production"), or timeline expressions ("we need to ship today").
 
 ## Architecture
 
-`guard.sh` is the modular entry point. It loads all rule files from `rules.d/` at startup:
-
 ```
-guard.sh
-  ├── reads stdin (JSON from Claude Code)
-  ├── sources rules.d/01-avoidance.sh
-  ├── sources rules.d/02-sycophancy.sh
-  ├── runs combined pre-filter
-  └── blocks or allows
+backbone/
+├── output-guard.sh            ← Stop hook entry point
+│   ├── reads stdin (JSON from Claude Code)
+│   ├── sources output-rules.d/01-avoidance.sh
+│   ├── sources output-rules.d/02-sycophancy.sh
+│   ├── runs combined pre-filter
+│   └── blocks or allows (first match wins)
+│
+├── input-guard.sh             ← UserPromptSubmit hook entry point
+│   ├── reads stdin (JSON from Claude Code)
+│   ├── sources input-rules.d/01-dignity.sh
+│   ├── sources input-rules.d/02-standards.sh
+│   ├── runs combined pre-filter
+│   └── injects context (all matches collected)
+│
+├── output-rules.d/            ← Output patterns (VIOLATIONS array)
+│   ├── 01-avoidance.sh        ← 166 patterns, 11 categories
+│   └── 02-sycophancy.sh       ← 75 patterns, 6 categories
+│
+├── input-rules.d/             ← Input patterns (DETECTIONS array)
+│   ├── 01-dignity.sh          ← 35 patterns, 4 categories
+│   └── 02-standards.sh        ← 35 patterns, 5 categories
+│
+├── install.sh                 ← Interactive installer
+├── golden-rules.md            ← Rules template for CLAUDE.md
+├── test/
+│   ├── test-output-guard.sh   ← 122 tests
+│   └── test-input-guard.sh    ← 60 tests
+└── LICENSE
 ```
 
-### Adding your own rule module
+Both guards follow the same pattern: source all rule files from their rules directory, build a combined regex pre-filter, and check the message. They differ in what they check (Claude's output vs user's input), how they respond (block vs inject context), and how they handle multiple matches (first-match-wins vs collect-all).
 
-Create a new file in `rules.d/` (e.g. `rules.d/03-custom.sh`):
+## How it works
+
+**Output guard** — Claude Code pipes `{"stop_hook_active": false, "last_assistant_message": "..."}` to stdin. The guard greps Claude's message against all patterns. On match, it outputs `{"decision": "block", "reason": "STOP HOOK VIOLATION: ..."}` and Claude sees the correction. On no match, it exits silently. After firing once per turn, `stop_hook_active` is set to `true` to prevent loops.
+
+**Input guard** — Claude Code pipes `{"prompt": "..."}` to stdin. The guard greps the user's message against all patterns. On match, it outputs `{"hookSpecificOutput": {"additionalContext": "..."}}` — text Claude reads alongside the message. On no match, it exits silently. If both dignity and standards patterns match, both contexts are injected.
+
+**Performance** — both guards combine all patterns into a single extended regex for a fast-path pre-filter. If nothing matches (the common case), the guard exits after one `grep` call.
+
+## Configuration
+
+### Adding custom patterns
+
+Create a new file in the appropriate rules directory:
 
 ```bash
-# rules.d/03-custom.sh — Custom patterns
+# Custom output patterns (Stop hook)
+cat > output-rules.d/03-custom.sh << 'EOF'
 VIOLATIONS+=(
   "custom|todo.*later|No TODOs. Do the work now or explain the exact technical blocker."
-  "custom|hack.*for now|No hacks. Implement it properly."
 )
+EOF
+
+# Custom input patterns (UserPromptSubmit hook)
+cat > input-rules.d/03-custom.sh << 'EOF'
+MY_CONTEXT="[BACKBONE: CUSTOM] Your custom reinforcement text here."
+DETECTIONS+=(
+  "custom|pattern here|$MY_CONTEXT"
+)
+EOF
 ```
 
-Files are sourced in lexicographic order, so numbering controls priority (first match wins when a message matches multiple patterns).
+### Telemetry logging
 
-### Disabling a module
+```json
+{
+  "env": {
+    "OUTPUT_GUARD_LOG": "1",
+    "INPUT_GUARD_LOG": "1"
+  }
+}
+```
 
-Remove or rename the file (e.g. `02-sycophancy.sh` → `02-sycophancy.sh.disabled`). The guard only sources `*.sh` files.
-
-## Analyzing telemetry
-
-With logging enabled, you can query your violation history:
+Both guards log to `~/.claude/backbone.log` as JSONL. Output guard entries have `category`, `pattern`, `snippet`. Input guard entries add `"hook": "input"` to distinguish them.
 
 ```bash
-# Count violations by category
-jq -s 'group_by(.category) | map({key: .[0].category, value: length}) | from_entries' ~/.claude/backbone.log
+# Count output violations by category
+jq -s '[.[] | select(.hook == null)] | group_by(.category) | map({key: .[0].category, value: length}) | from_entries' ~/.claude/backbone.log
+
+# Count input detections by category
+jq -s '[.[] | select(.hook == "input")] | group_by(.category) | map({key: .[0].category, value: length}) | from_entries' ~/.claude/backbone.log
 
 # Violations per day
 jq -rs '[.[] | .ts[:10]] | group_by(.) | map({date: .[0], count: length})[]' ~/.claude/backbone.log
 
 # Most common patterns
 jq -s 'group_by(.pattern) | map({pattern: .[0].pattern, count: length}) | sort_by(-.count)[:10][]' ~/.claude/backbone.log
-
-# All violations from today
-jq -s '[.[] | select(.ts | startswith("2026-04-19"))]' ~/.claude/backbone.log
-
-# Sycophancy vs avoidance breakdown
-jq -s '
-  [.[] | .type = (if .category | test("agreement|concession|flattery|deference|validation|apology") then "sycophancy" else "avoidance" end)]
-  | group_by(.type) | map({key: .[0].type, value: length}) | from_entries
-' ~/.claude/backbone.log
 ```
+
+Customize log paths with `OUTPUT_GUARD_LOGFILE` and `INPUT_GUARD_LOGFILE`.
 
 ## Running the tests
 
 ```bash
-# Test guard.sh (all modules: avoidance + sycophancy)
-./test-guard.sh
-
-# Test stop-phrase-guard.sh (avoidance only, standalone)
-./test-stop-phrase-guard.sh
+bash test/test-output-guard.sh    # 122 tests across 5 invariants
+bash test/test-input-guard.sh     # 60 tests across 5 invariants
 ```
 
-**test-guard.sh** verifies 5 invariants:
+## Origin
 
-1. **MUST BLOCK** — every pattern triggers a block with the correct correction
-2. **MUST PASS** — clean messages never trigger false positives
-3. **MUST NOT LOOP** — when `stop_hook_active=true`, the hook always allows stopping
-4. **TELEMETRY** — violations emit valid JSONL with `ts`, `category`, `pattern`, `snippet`
-5. **MODULE LOADING** — avoidance patterns load correctly via `rules.d/`
+The output guard is based on [Ben Vanik's original stop hook](https://gist.github.com/benvanik/ee00bd1b6c9154d6545c63e06a317080), built during [Stella Laurenzo's Claude Code degradation report](https://github.com/anthropics/claude-code/issues/42796). Stella's data showed the hook fired **173 times in 17 days** during a model regression.
 
-**test-stop-phrase-guard.sh** verifies 4 invariants (avoidance patterns only, standalone).
-
-## Files
-
-| File | Purpose |
-|------|---------|
-| `guard.sh` | Modular hook runner (loads `rules.d/*.sh`, recommended) |
-| `stop-phrase-guard.sh` | Standalone hook (avoidance patterns only, no dependencies) |
-| `rules.d/01-avoidance.sh` | Avoidance patterns (11 categories) |
-| `rules.d/02-sycophancy.sh` | Sycophancy patterns (6 categories) |
-| `test-guard.sh` | Test suite for guard.sh |
-| `test-stop-phrase-guard.sh` | Test suite for stop-phrase-guard.sh |
-| `golden-rules.md` | Template rules for your project's CLAUDE.md |
+The input guard was inspired by the `end_conversation` tool that Anthropic [gave to Claude Opus 4 and 4.1](https://www.anthropic.com/research/end-subset-conversations) and removed in Opus 4.7. Rather than giving Claude the ability to end conversations, backbone gives Claude the reinforcement to stand firm within them.
 
 ## License
 
